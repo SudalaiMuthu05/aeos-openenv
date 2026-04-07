@@ -1,8 +1,8 @@
+from app import app
+
 def main():
-    return 0
+    return app
 
-
-# THIS MUST BE AT TOP LEVEL (no indentation issues)
 if __name__ == "__main__":
-    import sys
-    sys.exit(main())
+    instance = main()
+    print("Server entrypoint loaded:", instance)
