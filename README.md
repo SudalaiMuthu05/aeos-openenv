@@ -69,3 +69,4 @@ docker run -p 7860:7860 aeos-env
 ```
 
 ---
+*Built with ❤️ for the Advanced Agentic Coding community.*

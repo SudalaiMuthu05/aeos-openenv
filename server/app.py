@@ -1,3 +1,4 @@
+from app import app
+
 def main():
-    from app import app
     return app
