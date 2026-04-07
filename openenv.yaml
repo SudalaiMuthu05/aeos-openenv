@@ -1,0 +1,15 @@
+name: aeos_env
+description: Autonomous Enterprise Operations Simulator
+
+entrypoint: app:app
+
+tasks:
+  - triage_easy
+  - resolution_medium
+  - ops_hard
+
+observation_space:
+  type: object
+
+action_space:
+  type: object
