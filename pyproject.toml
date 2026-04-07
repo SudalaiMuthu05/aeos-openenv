@@ -1,0 +1,17 @@
+[project]
+name = "aeos-env"
+version = "0.1.0"
+description = "Autonomous Enterprise Operations Simulator"
+authors = [
+    {name = "SudalaiMuthu"}
+]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "openai",
+    "requests"
+]
+
+[tool.openenv]
+entrypoint = "app:app"
