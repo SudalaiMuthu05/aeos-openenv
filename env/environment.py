@@ -10,6 +10,14 @@ from env.models import (
 )
 
 
+# -----------------------------
+# GLOBAL NORMALIZER
+# -----------------------------
+def normalize(value: float) -> float:
+    EPS = 1e-6
+    return max(EPS, min(value, 1.0 - EPS))
+
+
 class AEOSEnv:
 
     def __init__(self):
@@ -55,7 +63,7 @@ class AEOSEnv:
     # STEP
     # -----------------------------
     def step(self, action: AEOSAction) -> AEOSStepResult:
-        reward = 0.0
+        reward = 0.5  # 🔥 start neutral instead of 0.0
         done = False
         feedback = ""
 
@@ -82,7 +90,7 @@ class AEOSEnv:
 
                 feedback = "Task assigned"
             else:
-                reward -= 0.5
+                reward -= 0.3  # 🔥 reduced penalty
                 feedback = "Invalid agent"
 
         elif action.action_type == "escalate":
@@ -90,7 +98,7 @@ class AEOSEnv:
             feedback = "Escalated"
 
         else:
-            reward -= 0.5
+            reward -= 0.3  # 🔥 safer penalty
             feedback = "Invalid action"
 
         # ---- SLA DECAY ----
@@ -98,7 +106,7 @@ class AEOSEnv:
             self.state_data.sla_deadlines[key] -= 1
 
             if self.state_data.sla_deadlines[key] < 0:
-                reward -= 0.1 * abs(self.state_data.sla_deadlines[key])
+                reward -= 0.05 * abs(self.state_data.sla_deadlines[key])
 
         # ---- SYSTEM STABILITY BONUS ----
         if all(v >= 0 for v in self.state_data.sla_deadlines.values()):
@@ -108,11 +116,14 @@ class AEOSEnv:
         if self.state_data.time_step >= self.max_steps:
             done = True
 
+        # 🔥 FINAL NORMALIZATION (CRITICAL)
+        reward = normalize(reward)
+
         observation = self._get_observation(feedback)
 
         return AEOSStepResult(
             observation=observation,
-            reward=max(min(reward, 1.0), -1.0),
+            reward=reward,
             done=done,
             info={}
         )
