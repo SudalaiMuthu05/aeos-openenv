@@ -8,11 +8,11 @@ from env.tasks import TASKS
 # CONFIG (MANDATORY)
 # -----------------------------
 
-API_BASE_URL = os.environ["API_BASE_URL"]   # LLM proxy URL
-API_KEY = os.environ["API_KEY"]             # LLM proxy key
+API_BASE_URL = os.environ["API_BASE_URL"]
+API_KEY = os.environ["API_KEY"]
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
 
-ENV_URL = "http://localhost:7860"  # your FastAPI env (HF default port)
+ENV_URL = "http://localhost:7860"
 
 client = OpenAI(
     api_key=API_KEY,
@@ -20,6 +20,7 @@ client = OpenAI(
 )
 
 SUCCESS_THRESHOLD = 0.3
+EPS = 1e-6
 
 
 # -----------------------------
@@ -45,6 +46,14 @@ def log_end(success, steps, score, rewards):
         f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}",
         flush=True,
     )
+
+
+# -----------------------------
+# SAFE NORMALIZER
+# -----------------------------
+
+def normalize(value):
+    return max(EPS, min(value, 1.0 - EPS))
 
 
 # -----------------------------
@@ -109,8 +118,9 @@ def run_task(task_id, task_config):
         res = requests.post(f"{ENV_URL}/reset")
         res.raise_for_status()
     except Exception:
-        log_end(False, 0, 0.0, [])
-        return 0.0
+        safe_score = normalize(0.5)
+        log_end(False, 0, safe_score, [])
+        return safe_score
 
     for step in range(1, max_steps + 1):
 
@@ -127,10 +137,12 @@ def run_task(task_id, task_config):
             res.raise_for_status()
             data = res.json()
         except Exception as e:
-            log_step(step, action_type, 0.0, True, str(e))
+            safe_reward = normalize(0.5)
+            log_step(step, action_type, safe_reward, True, str(e))
+            rewards.append(safe_reward)
             break
 
-        reward = data.get("reward", 0.0)
+        reward = normalize(data.get("reward", 0.5))
         done = data.get("done", False)
 
         rewards.append(reward)
@@ -141,12 +153,16 @@ def run_task(task_id, task_config):
         if done:
             break
 
-    # Normalize score
-    score = sum(rewards) / len(rewards) if rewards else 0.5
-    
-    # STRICT RANGE FIX
-    EPS = 1e-6
-    score = max(EPS, min(score, 1.0 - EPS))
+    # -----------------------------
+    # FINAL SCORE (STRICT SAFE)
+    # -----------------------------
+
+    if rewards:
+        score = sum(rewards) / len(rewards)
+    else:
+        score = 0.5
+
+    score = normalize(score)
 
     success = score >= SUCCESS_THRESHOLD
 
@@ -167,7 +183,7 @@ def main():
     if TASKS:
         total_score /= len(TASKS)
 
-    return total_score
+    return normalize(total_score)
 
 
 if __name__ == "__main__":
