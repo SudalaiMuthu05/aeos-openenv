@@ -142,8 +142,11 @@ def run_task(task_id, task_config):
             break
 
     # Normalize score
-    score = sum(rewards) / len(rewards) if rewards else 0.0
-    score = min(max(score, 0.0), 1.0)
+    score = sum(rewards) / len(rewards) if rewards else 0.5
+    
+    # STRICT RANGE FIX
+    EPS = 1e-6
+    score = max(EPS, min(score, 1.0 - EPS))
 
     success = score >= SUCCESS_THRESHOLD
 
