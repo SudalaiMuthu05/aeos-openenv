@@ -57,16 +57,16 @@ def normalize(value):
 
 
 # -----------------------------
-# BASELINE FALLBACK AGENT
+# INTELLIGENT FALLBACK AGENT (UPGRADED)
 # -----------------------------
 
-def fallback_action(step):
-    if step % 3 == 0:
-        return "assign"
-    elif step % 2 == 0:
-        return "respond"
-    else:
-        return "classify"
+def fallback_action(step, obs=None):
+    if obs:
+        if len(obs.get("pending_emails", [])) > 0:
+            return "classify"
+        if len(obs.get("pending_tickets", [])) > 0:
+            return "respond"
+    return "assign"
 
 
 # -----------------------------
@@ -82,6 +82,8 @@ def get_llm_action(step, obs):
                     "role": "system",
                     "content": """You are a high-performance enterprise operations agent.
 
+Think step-by-step internally, but output ONLY the final action.
+
 Goals:
 - Minimize SLA violations
 - Balance team workload
@@ -91,11 +93,6 @@ Actions:
 - classify → for new items
 - respond → resolve urgent issues
 - assign → distribute workload
-
-Decision Strategy:
-- If there are pending items → classify
-- If workload is low → assign
-- If urgent tasks exist → respond
 
 Return ONLY one word: classify, respond, or assign.
 """
@@ -120,12 +117,12 @@ Choose best action:
         action = completion.choices[0].message.content.strip().lower()
 
         if action not in ["classify", "respond", "assign"]:
-            return fallback_action(step)
+            return fallback_action(step, obs)
 
         return action
 
     except Exception:
-        return fallback_action(step)
+        return fallback_action(step, obs)
 
 
 # -----------------------------
@@ -139,7 +136,6 @@ def run_task(task_id, task_config):
 
     log_start(task=task_id, env="aeos_env", model=MODEL_NAME)
 
-    # Reset environment
     try:
         res = requests.post(f"{ENV_URL}/reset")
         res.raise_for_status()
@@ -151,19 +147,23 @@ def run_task(task_id, task_config):
 
     for step in range(1, max_steps + 1):
 
-        # 🔥 FIRST STEP BOOST (smart start)
+        obs = data.get("observation", {})
+
+        obs_context = {
+            "pending_emails": obs.get("pending_emails", []),
+            "pending_tickets": obs.get("pending_tickets", []),
+            "team_load": obs.get("team_load", {}),
+        }
+
+        # 🔥 Smart first move
         if step == 1:
             action_type = "classify"
         else:
-            obs = data.get("observation", {})
-
-            obs_context = {
-                "pending_emails": obs.get("pending_emails", []),
-                "pending_tickets": obs.get("pending_tickets", []),
-                "team_load": obs.get("team_load", {}),
-            }
-
             action_type = get_llm_action(step, obs_context)
+
+        # 🔥 Anti-loop safety
+        if len(rewards) >= 2 and rewards[-1] < 0.4:
+            action_type = fallback_action(step, obs_context)
 
         action_payload = {
             "action_type": action_type,
@@ -192,15 +192,8 @@ def run_task(task_id, task_config):
         if done:
             break
 
-    # -----------------------------
-    # FINAL SCORE (STRICT SAFE)
-    # -----------------------------
-
-    if rewards:
-        score = sum(rewards) / len(rewards)
-    else:
-        score = 0.5
-
+    # FINAL SCORE
+    score = sum(rewards) / len(rewards) if rewards else 0.5
     score = normalize(score)
 
     success = score >= SUCCESS_THRESHOLD
@@ -210,7 +203,7 @@ def run_task(task_id, task_config):
 
 
 # -----------------------------
-# MAIN EXECUTION
+# MAIN
 # -----------------------------
 
 def main():
