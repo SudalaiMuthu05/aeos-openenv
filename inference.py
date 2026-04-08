@@ -70,21 +70,47 @@ def fallback_action(step):
 
 
 # -----------------------------
-# LLM ACTION GENERATOR
+# LLM ACTION GENERATOR (UPGRADED)
 # -----------------------------
 
-def get_llm_action(step):
+def get_llm_action(step, obs):
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {
                     "role": "system",
-                    "content": "You are an enterprise operations agent. Choose ONE action from: classify, respond, assign."
+                    "content": """You are a high-performance enterprise operations agent.
+
+Goals:
+- Minimize SLA violations
+- Balance team workload
+- Resolve tasks efficiently
+
+Actions:
+- classify → for new items
+- respond → resolve urgent issues
+- assign → distribute workload
+
+Decision Strategy:
+- If there are pending items → classify
+- If workload is low → assign
+- If urgent tasks exist → respond
+
+Return ONLY one word: classify, respond, or assign.
+"""
                 },
                 {
                     "role": "user",
-                    "content": f"Step {step}: choose the best action."
+                    "content": f"""
+Step: {step}
+
+Pending Emails: {obs['pending_emails']}
+Pending Tickets: {obs['pending_tickets']}
+Team Load: {obs['team_load']}
+
+Choose best action:
+"""
                 }
             ],
             max_tokens=10,
@@ -117,6 +143,7 @@ def run_task(task_id, task_config):
     try:
         res = requests.post(f"{ENV_URL}/reset")
         res.raise_for_status()
+        data = res.json()
     except Exception:
         safe_score = normalize(0.5)
         log_end(False, 0, safe_score, [])
@@ -124,7 +151,19 @@ def run_task(task_id, task_config):
 
     for step in range(1, max_steps + 1):
 
-        action_type = get_llm_action(step)
+        # 🔥 FIRST STEP BOOST (smart start)
+        if step == 1:
+            action_type = "classify"
+        else:
+            obs = data.get("observation", {})
+
+            obs_context = {
+                "pending_emails": obs.get("pending_emails", []),
+                "pending_tickets": obs.get("pending_tickets", []),
+                "team_load": obs.get("team_load", {}),
+            }
+
+            action_type = get_llm_action(step, obs_context)
 
         action_payload = {
             "action_type": action_type,
