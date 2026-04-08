@@ -5,15 +5,19 @@ from typing import List
 from env.tasks import TASKS
 
 # -----------------------------
-# CONFIG
+# CONFIG (MANDATORY)
 # -----------------------------
 
-API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
+API_BASE_URL = os.environ["API_BASE_URL"]   # LLM proxy URL
+API_KEY = os.environ["API_KEY"]             # LLM proxy key
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
-HF_TOKEN = os.getenv("HF_TOKEN")
 
-# Minimal safe compliance: initialize the OpenAI client
-client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
+ENV_URL = "http://localhost:7860"  # your FastAPI env (HF default port)
+
+client = OpenAI(
+    api_key=API_KEY,
+    base_url=API_BASE_URL
+)
 
 SUCCESS_THRESHOLD = 0.3
 
@@ -44,11 +48,10 @@ def log_end(success, steps, score, rewards):
 
 
 # -----------------------------
-# SIMPLE AGENT (BASELINE)
+# BASELINE FALLBACK AGENT
 # -----------------------------
 
-def choose_action(step):
-    # simple deterministic baseline
+def fallback_action(step):
     if step % 3 == 0:
         return "assign"
     elif step % 2 == 0:
@@ -58,7 +61,40 @@ def choose_action(step):
 
 
 # -----------------------------
-# MAIN LOOP
+# LLM ACTION GENERATOR
+# -----------------------------
+
+def get_llm_action(step):
+    try:
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an enterprise operations agent. Choose ONE action from: classify, respond, assign."
+                },
+                {
+                    "role": "user",
+                    "content": f"Step {step}: choose the best action."
+                }
+            ],
+            max_tokens=10,
+            temperature=0.0,
+        )
+
+        action = completion.choices[0].message.content.strip().lower()
+
+        if action not in ["classify", "respond", "assign"]:
+            return fallback_action(step)
+
+        return action
+
+    except Exception:
+        return fallback_action(step)
+
+
+# -----------------------------
+# TASK RUNNER
 # -----------------------------
 
 def run_task(task_id, task_config):
@@ -68,18 +104,17 @@ def run_task(task_id, task_config):
 
     log_start(task=task_id, env="aeos_env", model=MODEL_NAME)
 
-    # reset env
+    # Reset environment
     try:
-        res = requests.post(f"{API_BASE_URL}/reset")
+        res = requests.post(f"{ENV_URL}/reset")
         res.raise_for_status()
-        obs = res.json()
-    except Exception as e:
+    except Exception:
         log_end(False, 0, 0.0, [])
         return 0.0
 
     for step in range(1, max_steps + 1):
 
-        action_type = choose_action(step)
+        action_type = get_llm_action(step)
 
         action_payload = {
             "action_type": action_type,
@@ -88,7 +123,7 @@ def run_task(task_id, task_config):
         }
 
         try:
-            res = requests.post(f"{API_BASE_URL}/step", json=action_payload)
+            res = requests.post(f"{ENV_URL}/step", json=action_payload)
             res.raise_for_status()
             data = res.json()
         except Exception as e:
@@ -106,7 +141,7 @@ def run_task(task_id, task_config):
         if done:
             break
 
-    # normalize score
+    # Normalize score
     score = sum(rewards) / len(rewards) if rewards else 0.0
     score = min(max(score, 0.0), 1.0)
 
@@ -116,12 +151,20 @@ def run_task(task_id, task_config):
     return score
 
 
+# -----------------------------
+# MAIN EXECUTION
+# -----------------------------
+
 def main():
     total_score = 0.0
+
     for task_id, task_config in TASKS.items():
         total_score += run_task(task_id, task_config)
-    
-    total_score / len(TASKS) if TASKS else 0.0
+
+    if TASKS:
+        total_score /= len(TASKS)
+
+    return total_score
 
 
 if __name__ == "__main__":
