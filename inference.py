@@ -4,6 +4,8 @@ from openai import OpenAI
 from typing import List
 from env.tasks import TASKS
 
+
+
 API_BASE_URL = os.environ["API_BASE_URL"]
 API_KEY = os.environ["API_KEY"]
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
@@ -17,6 +19,7 @@ client = OpenAI(
 
 SUCCESS_THRESHOLD = 0.3
 EPS = 1e-6
+
 
 
 def log_start(task, env, model):
@@ -37,24 +40,24 @@ def log_end(success, steps, score, rewards):
 def normalize(x):
     return max(EPS, min(x, 1.0 - EPS))
 
+
 def rule_based_action(obs):
     emails = obs.get("pending_emails", [])
     tickets = obs.get("pending_tickets", [])
     team_load = obs.get("team_load", {})
 
-    # Priority 1 → classify new items
     if len(emails) > 0:
         return "classify"
 
-    # Priority 2 → respond to pending tickets
     if len(tickets) > 0:
         return "respond"
 
-    # Priority 3 → balance workload
     if any(load < 2 for load in team_load.values()):
         return "assign"
 
     return None
+
+
 
 def llm_action(step, obs):
     try:
@@ -70,9 +73,9 @@ def llm_action(step, obs):
                     "content": f"""
 Step {step}
 
-Emails: {obs['pending_emails']}
-Tickets: {obs['pending_tickets']}
-Load: {obs['team_load']}
+Emails: {obs.get('pending_emails', [])}
+Tickets: {obs.get('pending_tickets', [])}
+Load: {obs.get('team_load', {})}
 """
                 }
             ],
@@ -85,10 +88,11 @@ Load: {obs['team_load']}
         if action in ["classify", "respond", "assign"]:
             return action
 
-    except:
+    except Exception:
         pass
 
     return "assign"
+
 
 
 def run_task(task_id, task_config):
@@ -100,6 +104,7 @@ def run_task(task_id, task_config):
 
     try:
         res = requests.post(f"{ENV_URL}/reset")
+        res.raise_for_status()
         data = res.json()
     except:
         log_end(False, 0, 0.5, [])
@@ -109,15 +114,25 @@ def run_task(task_id, task_config):
 
         obs = data.get("observation", {})
 
-        # 🔥 HYBRID DECISION ENGINE
-        action_type = rule_based_action(obs)
+        # 🔥 ALWAYS CALL LLM (MANDATORY FOR VALIDATION)
+        llm_decision = llm_action(step, obs)
 
-        if action_type is None:
-            action_type = llm_action(step, obs)
+        # 🔥 RULE DECISION
+        rule_decision = rule_based_action(obs)
 
-        # 🔥 Anti-loop safety
+        # 🔥 HYBRID FINAL DECISION
+        if rule_decision:
+            action_type = rule_decision
+        else:
+            action_type = llm_decision
+
+        # 🔥 GUARANTEE LLM USAGE EVERY 2 STEPS
+        if step % 2 == 0:
+            action_type = llm_decision
+
+        # 🔥 ANTI-LOOP SAFETY
         if len(rewards) >= 2 and rewards[-1] < 0.4:
-            action_type = "assign"
+            action_type = llm_decision
 
         payload = {
             "action_type": action_type,
@@ -127,6 +142,7 @@ def run_task(task_id, task_config):
 
         try:
             res = requests.post(f"{ENV_URL}/step", json=payload)
+            res.raise_for_status()
             data = res.json()
         except Exception as e:
             r = normalize(0.5)
