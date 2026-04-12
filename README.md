@@ -53,6 +53,17 @@ python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 python inference.py
 ```
 
+## 🌐 Decision Intelligence
+
+AEOS uses a hybrid decision engine:
+
+- Rule-based prioritization for SLA-sensitive tasks  
+- LLM-based reasoning for adaptive decisions  
+- Dynamic workload balancing  
+- Anti-loop stability mechanism  
+
+This ensures consistent and realistic enterprise simulation.
+
 ## 🧪 Evaluation System
 
 AEOS evaluates agents across three difficulty levels:
@@ -67,6 +78,3 @@ Build and run your container locally:
 docker build -t aeos-env .
 docker run -p 7860:7860 aeos-env
 ```
-
----
-*Built with ❤️ for the Advanced Agentic Coding community.*
