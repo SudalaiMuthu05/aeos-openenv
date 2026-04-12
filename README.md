@@ -8,73 +8,107 @@ app_file: app.py
 pinned: false
 ---
 
-# AEOS: Autonomous Enterprise Operations Simulator 🚀
+# 🚀 AEOS: Autonomous Enterprise Operations Simulator
 
-AEOS is a production-grade, autonomous environment for simulating and evaluating enterprise-level operational workflows. Designed for the OpenEnv ecosystem, it features a robust FastAPI backend, deterministic reward shaping, and multi-tier task evaluation.
+AEOS is a **production-grade autonomous environment** designed to simulate and evaluate enterprise-level operational workflows. Built for the OpenEnv ecosystem, it combines structured simulation, intelligent agents, and robust evaluation mechanisms.
+
+---
 
 ## 🏗️ Project Architecture
 
-```text
 AEOS/
-├── app.py              # FastAPI server (API layer)
-├── inference.py        # Automated agent runner (Inference layer)
-├── openenv.yaml        # OpenEnv compliance specification
-├── Dockerfile          # Scalable deployment container
-├── requirements.txt    # Dependency manifest
+├── app.py # FastAPI server (API layer)
+├── inference.py # Intelligent agent (LLM + rules)
+├── openenv.yaml # OpenEnv compliance specification
+├── Dockerfile # Deployment container (HF compatible)
+├── requirements.txt # Dependencies
 └── env/
-    ├── environment.py  # Core simulation logic & state machine
-    ├── models.py       # Pydantic data schemas
-    ├── tasks.py        # Task difficulty definitions
-    └── graders.py      # Deterministic evaluation algorithms
-```
+├── environment.py # Core simulation engine
+├── models.py # Data schemas (Pydantic)
+├── tasks.py # Task definitions (Easy/Medium/Hard)
+└── graders.py # Deterministic evaluation logic
+
+
+---
 
 ## 🧠 Key Features
 
-- **Dynamic State Management:** Tracks real-time emails, tickets, and agent workloads.
-- **Advanced Reward Engineering:** Multi-faceted rewards including immediate action signals, efficiency bonuses, and long-term system stability incentives.
-- **SLA Decay Simulation:** Realistic time-sensitive penalties for pending tasks.
-- **OpenEnv Compliant:** Fully supports `openenv validate` and standardized logging formats.
-- **Production-Ready:** Includes Docker support for seamless deployment to platforms like Hugging Face Spaces.
+### 🔹 Dynamic State Management
+- Tracks emails, tickets, agent workloads, and SLA deadlines in real-time  
+- Maintains evolving system state across steps  
+
+### 🔹 Advanced Reward Engineering
+- Immediate action rewards  
+- Efficiency-based incentives  
+- Long-term system stability bonuses  
+
+### 🔹 SLA-Aware Simulation
+- Time-decay penalties for delayed tasks  
+- Encourages prioritization and urgency handling  
+
+### 🔹 OpenEnv Compliant
+- Fully compatible with `openenv validate`  
+- Strict API contract: `/reset`, `/step`, `/state`  
+- Standardized logging (`[START]`, `[STEP]`, `[END]`)  
+
+### 🔹 Production Ready
+- Dockerized for Hugging Face Spaces  
+- Stateless API design  
+- Scalable and modular architecture  
+
+---
+
+## 🌐 Decision Intelligence
+
+AEOS implements a **hybrid intelligent agent system**:
+
+- 🔹 Rule-based prioritization for SLA-sensitive tasks  
+- 🔹 LLM-based reasoning via OpenAI proxy (LiteLLM compliant)  
+- 🔹 Dynamic workload balancing across agents  
+- 🔹 Anti-loop and stability-aware execution  
+
+This ensures:
+> realistic, consistent, and high-quality enterprise decision-making
+
+---
+
+## 🧪 Evaluation System
+
+AEOS evaluates performance across three difficulty tiers:
+
+| Level | Task | Description |
+|------|------|-------------|
+| 🟢 Easy | Triage | Classification of incoming emails/tickets |
+| 🟡 Medium | Resolution | Responding to tasks efficiently |
+| 🔴 Hard | Ops Management | SLA handling + workload balancing |
+
+---
 
 ## 🚀 Getting Started
 
 ### 1. Install Dependencies
-```bash
 python -m pip install -r requirements.txt
-```
 
 ### 2. Run the Server
-```bash
 python -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
-```
 
-### 3. Execute Inference & Scoring
-```bash
+### 3. Execute Inference
 python inference.py
-```
-
-## 🌐 Decision Intelligence
-
-AEOS uses a hybrid decision engine:
-
-- Rule-based prioritization for SLA-sensitive tasks  
-- LLM-based reasoning for adaptive decisions  
-- Dynamic workload balancing  
-- Anti-loop stability mechanism  
-
-This ensures consistent and realistic enterprise simulation.
-
-## 🧪 Evaluation System
-
-AEOS evaluates agents across three difficulty levels:
-- **Triage (Easy):** Correct classification of incoming data.
-- **Resolution (Medium):** Proficiency in responding to entities.
-- **Ops Management (Hard):** Balancing workloads and mastering SLA deadlines.
 
 ## 🐳 Docker Deployment
-
-Build and run your container locally:
-```bash
 docker build -t aeos-env .
 docker run -p 7860:7860 aeos-env
-```
+
+
+## 🏆 Why AEOS Stands Out
+Hybrid LLM + rule-based intelligence
+Real-world SLA-driven simulation
+Strong reward shaping for RL evaluation
+Fully OpenEnv-compliant architecture
+Designed for scalability and realism
+
+## 📌 Summary
+
+AEOS is not just a simulation — it is a decision-making system that models real enterprise workflows with intelligence, adaptability, and precision.
+
+---
