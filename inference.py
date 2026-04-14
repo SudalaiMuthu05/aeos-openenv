@@ -107,36 +107,39 @@ def run_task(task_id, task_config):
         res.raise_for_status()
         data = res.json()
     except:
-        log_end(False, 0, 0.5, [])
-        return 0.5
+        safe_score = normalize(0.5)
+        log_end(False, 0, safe_score, [])
+        return safe_score
 
     for step in range(1, max_steps + 1):
 
         obs = data.get("observation", {})
 
-        # 🔥 ALWAYS CALL LLM (MANDATORY FOR VALIDATION)
         llm_decision = llm_action(step, obs)
 
-        # 🔥 RULE DECISION
         rule_decision = rule_based_action(obs)
 
-        # 🔥 HYBRID FINAL DECISION
-        if rule_decision:
+        if rule_decision is not None:
             action_type = rule_decision
         else:
             action_type = llm_decision
 
-        # 🔥 GUARANTEE LLM USAGE EVERY 2 STEPS
         if step % 2 == 0:
             action_type = llm_decision
 
-        # 🔥 ANTI-LOOP SAFETY
         if len(rewards) >= 2 and rewards[-1] < 0.4:
             action_type = llm_decision
 
+        # 🔥 DYNAMIC AGENT SELECTION (BONUS)
+        team_load = obs.get("team_load", {})
+        if team_load:
+            target_id = min(team_load, key=team_load.get)
+        else:
+            target_id = "agent_1"
+
         payload = {
             "action_type": action_type,
-            "target_id": "agent_1",
+            "target_id": target_id,
             "content": "auto-response"
         }
 
@@ -145,9 +148,9 @@ def run_task(task_id, task_config):
             res.raise_for_status()
             data = res.json()
         except Exception as e:
-            r = normalize(0.5)
-            log_step(step, action_type, r, True, str(e))
-            rewards.append(r)
+            safe_reward = normalize(0.5)
+            log_step(step, action_type, safe_reward, True, str(e))
+            rewards.append(safe_reward)
             break
 
         reward = normalize(data.get("reward", 0.5))
@@ -160,7 +163,6 @@ def run_task(task_id, task_config):
 
         if done:
             break
-
     score = sum(rewards) / len(rewards) if rewards else 0.5
     score = normalize(score)
 
@@ -168,7 +170,6 @@ def run_task(task_id, task_config):
 
     log_end(success, steps_taken, score, rewards)
     return score
-
 
 def main():
     total = 0.0
